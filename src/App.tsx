@@ -2,18 +2,20 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
-import { LocalizationProvider } from '@mui/x-date-pickers';
 import { CssBaseline } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import dayjs from 'dayjs';
 import 'dayjs/locale/fr';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { fr } from 'date-fns/locale';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { theme } from './theme';
 import { AppLayout } from './components/layout/AppLayout';
 import { LoginForm } from './components/auth/LoginForm';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+
+
+
 
 // Pages existantes
 import { Dashboard } from './pages/Dashboard';
@@ -115,18 +117,30 @@ const AppRoutes: React.FC = () => {
 };
 
 function App() {
-  return (
-    <ThemeProvider theme={theme}>
-      <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
-        <CssBaseline />
-        <AuthProvider>
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AuthProvider>
-      </LocalizationProvider>
-    </ThemeProvider>
-  );
+  const [value, setValue] = React.useState<dayjs.Dayjs | null>(null);
+
+  const onChange = (newValue: dayjs.Dayjs | null) => {
+    setValue(newValue);
+  };
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <LocalizationProvider dateAdapter={AdapterDayjs}>
+        <BrowserRouter>
+          <DatePicker
+            label="Date"
+            value={value}
+            onChange={onChange}
+          />
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </BrowserRouter>
+      </LocalizationProvider>
+    </ThemeProvider>
+  );
 }
+
 
 export default App;

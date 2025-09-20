@@ -1,371 +1,352 @@
 import React, { useState, useCallback } from 'react';
-import { useForm, Controller } from 'react-hook-form';
-import { yupResolver } from '@hookform/resolvers/yup';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Grid, MenuItem, FormControl,
-  InputLabel, Select, FormHelperText, Box,
-  CircularProgress, Alert,
+  Box,
+  Grid,
+  TextField,
+  Button,
+  Typography,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  FormHelperText,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers';
-import { PersonAdd } from '@mui/icons-material';
-import { personSchema } from '../../schemas/validationSchemas';
+import { Controller, useForm, useWatch, SubmitHandler } from 'react-hook-form';
+import { yupResolver } from '@hookform/resolvers/yup';
+import { PersonFormData } from '../../types/forms';
+import { personValidationSchema } from '../../utils/validation';
 import { PhotoUpload } from '../common/PhotoUpload';
 import { LocationPicker } from '../common/LocationPicker';
 import { VulnerabilityCalculator } from '../common/VulnerabilityCalculator';
-import { InferType } from 'yup';
-
-type PersonFormData = InferType<typeof personSchema>;
+import { NIPInput } from '../common/NIPInput';
 
 interface PersonFormProps {
-  open: boolean;
-  onClose: () => void;
   onSubmit: (data: PersonFormData) => Promise<void>;
   initialData?: Partial<PersonFormData>;
   mode: 'create' | 'edit';
 }
 
 export const PersonForm: React.FC<PersonFormProps> = ({
-  open, onClose, onSubmit, initialData, mode
+  onSubmit,
+  initialData,
+  mode
 }) => {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [vulnerabilityScore, setVulnerabilityScore] = useState<number | null>(null);
-
+  const [vulnerabilityScore, setVulnerabilityScore] = useState<number | null>(
+    initialData?.vulnerabilityScore || null
+  );
+  
   const {
     control,
     handleSubmit,
-    formState: { errors, isValid },
-    watch,
+    formState: { errors, isSubmitting },
     setValue,
-    reset
   } = useForm<PersonFormData>({
-    resolver: yupResolver(personSchema),
+    //resolver: yupResolver(personValidationSchema),//// Commentez cette ligne
     defaultValues: {
-      firstName: '',
-      lastName: '',
-      nationalId: '',
-      phoneNumber: '',
-      email: '',
-      gender: 'M',
-      province: 'Estuaire',
-      photo: null,
-      coordinates: null,
-      socialPrograms: [],
-      vulnerabilityScore: null,
-      ...initialData
+      firstName: initialData?.firstName || '',
+      lastName: initialData?.lastName || '',
+      nationalId: initialData?.nationalId || '',
+      nip: initialData?.nip || '',
+      phoneNumber: initialData?.phoneNumber || '',
+      email: initialData?.email || '',
+      dateOfBirth: initialData?.dateOfBirth || new Date(),
+      gender: initialData?.gender || 'M',
+      province: initialData?.province || '',
+      city: initialData?.city || '',
+      address: initialData?.address || '',
+      photo: initialData?.photo || null,
+      vulnerabilityScore: initialData?.vulnerabilityScore || null,
+      coordinates: initialData?.coordinates || null,
     },
-    mode: 'onChange'
   });
 
-  const watchedData = watch();
-
-  const handleFormSubmit = async (data: PersonFormData) => {
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    try {
-      const formData = {
-        ...data,
-        vulnerabilityScore
-      };
-
-      await onSubmit(formData);
-      reset();
-      onClose();
-    } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Erreur inconnue');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const watchedData = useWatch({ control });
 
   const handlePhotoUpload = useCallback((file: File | null) => {
     setValue('photo', file);
   }, [setValue]);
 
-  const handleLocationSelect = useCallback((coordinates: { latitude: number; longitude: number } | null) => {
-    setValue('coordinates', coordinates);
+  const handleLocationSelect = useCallback((location: { latitude: number; longitude: number }) => {
+    setValue('coordinates', location);
   }, [setValue]);
 
-  const gabonProvinces = [
-    'Estuaire', 'Haut-Ogooué', 'Moyen-Ogooué', 'Ngounié',
-    'Nyanga', 'Ogooué-Ivindo', 'Ogooué-Lolo', 'Ogooué-Maritime', 'Woleu-Ntem'
-  ];
+  const onFormSubmit = async (data: PersonFormData) => {
+    try {
+      const formData: PersonFormData = {
+        ...data,
+        vulnerabilityScore,
+      };
+      await onSubmit(formData);
+    } catch (error) {
+      console.error('Erreur soumission formulaire:', error);
+      throw error;
+    }
+  };
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth="md"
-      fullWidth
-      PaperProps={{ sx: { minHeight: '80vh' } }}
-    >
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-        <PersonAdd />
+    <Box component="form" onSubmit={handleSubmit(onFormSubmit)} noValidate>
+      <Typography variant="h6" gutterBottom>
         {mode === 'create' ? 'Nouvelle Identité' : 'Modifier Identité'}
-      </DialogTitle>
+      </Typography>
 
-      <DialogContent dividers>
-        <form onSubmit={handleSubmit(handleFormSubmit)}>
-          <Grid container spacing={3}>
-            
-            {/* Section Photo & Info Principale */}
-            <Grid item xs={12} md={4}>
-              <Box sx={{ textAlign: 'center', mb: 2 }}>
-                <PhotoUpload
-                  onUpload={handlePhotoUpload}
-                  preview={watchedData.photo as string | File | undefined}
-                />
-              </Box>
+      <Grid container spacing={3}>
+        {/* Section Photo & Info Principale */}
+        <Grid item xs={12} md={4}>
+          <Box sx={{ textAlign: 'center', mb: 2 }}>
+            <PhotoUpload
+              onUpload={handlePhotoUpload}
+              preview={watchedData.photo || null}
+            />
+          </Box>
+        </Grid>
 
-              {vulnerabilityScore && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  Score vulnérabilité: <strong>{vulnerabilityScore}/100</strong>
-                </Alert>
-              )}
-            </Grid>
-
-            {/* Informations Personnelles */}
-            <Grid item xs={12} md={8}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="firstName"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Prénom *"
-                        fullWidth
-                        error={!!errors.firstName}
-                        helperText={errors.firstName?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-                
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="lastName"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Nom de famille *"
-                        fullWidth
-                        error={!!errors.lastName}
-                        helperText={errors.lastName?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="nationalId"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="CNI Gabonaise *"
-                        fullWidth
-                        placeholder="123456789012"
-                        error={!!errors.nationalId}
-                        helperText={errors.nationalId?.message || "12 chiffres"}
-                        inputProps={{ maxLength: 12 }}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="phoneNumber"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Téléphone *"
-                        fullWidth
-                        placeholder="+241 01 23 45 67"
-                        error={!!errors.phoneNumber}
-                        helperText={errors.phoneNumber?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="email"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Email"
-                        fullWidth
-                        type="email"
-                        error={!!errors.email}
-                        helperText={errors.email?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="dateOfBirth"
-                    control={control}
-                    render={({ field }) => (
-                      <DatePicker
-                        {...field}
-                        label="Date de naissance *"
-                        slotProps={{
-                          textField: {
-                            fullWidth: true,
-                            error: !!errors.dateOfBirth,
-                            helperText: errors.dateOfBirth?.message,
-                          }
-                        }}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth error={!!errors.gender}>
-                    <InputLabel id="gender-label">Genre *</InputLabel>
-                    <Controller
-                      name="gender"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          labelId="gender-label"
-                          label="Genre *"
-                          fullWidth
-                        >
-                          <MenuItem value="M">Masculin</MenuItem>
-                          <MenuItem value="F">Féminin</MenuItem>
-                          <MenuItem value="Autre">Autre</MenuItem>
-                        </Select>
-                      )}
-                    />
-                    <FormHelperText>{errors.gender?.message}</FormHelperText>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth error={!!errors.province}>
-                    <InputLabel id="province-label">Province *</InputLabel>
-                    <Controller
-                      name="province"
-                      control={control}
-                      render={({ field }) => (
-                        <Select
-                          {...field}
-                          labelId="province-label"
-                          label="Province *"
-                          fullWidth
-                        >
-                          {gabonProvinces.map(p => (
-                            <MenuItem key={p} value={p}>{p}</MenuItem>
-                          ))}
-                        </Select>
-                      )}
-                    />
-                    <FormHelperText>{errors.province?.message}</FormHelperText>
-                  </FormControl>
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="city"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Ville *"
-                        fullWidth
-                        error={!!errors.city}
-                        helperText={errors.city?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-
-                <Grid item xs={12} sm={6}>
-                  <Controller
-                    name="address"
-                    control={control}
-                    render={({ field }) => (
-                      <TextField
-                        {...field}
-                        label="Adresse complète *"
-                        fullWidth
-                        multiline
-                        rows={2}
-                        error={!!errors.address}
-                        helperText={errors.address?.message}
-                      />
-                    )}
-                  />
-                </Grid>
-              </Grid>
-            </Grid>
-            
-            {/* Section Location & Vulnerability */}
-            <Grid item xs={12} md={6}>
-              <LocationPicker
-                onLocationSelect={handleLocationSelect}
-                initialLocation={initialData?.coordinates}
-              />
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <VulnerabilityCalculator
-                age={watchedData.dateOfBirth ? (new Date().getFullYear() - watchedData.dateOfBirth.getFullYear()) : null}
-                hasPhoto={!!watchedData.photo}
-                onScoreCalculate={setVulnerabilityScore}
-              />
+        {/* Informations Personnelles */}
+        <Grid item xs={12} md={8}>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
               <Controller
-                name="socialPrograms"
+                name="firstName"
                 control={control}
                 render={({ field }) => (
                   <TextField
                     {...field}
-                    label="Programmes Sociaux"
                     fullWidth
-                    InputProps={{
-                      readOnly: true,
-                    }}
-                    value={field.value?.join(', ') || ''}
-                    sx={{ mt: 2 }}
-                    error={!!errors.socialPrograms}
-                    helperText={errors.socialPrograms?.message}
+                    label="Prénom *"
+                    error={!!errors.firstName}
+                    helperText={errors.firstName?.message}
+                  />
+                )}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="lastName"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Nom *"
+                    error={!!errors.lastName}
+                    helperText={errors.lastName?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="nationalId"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="CNI *"
+                    placeholder="123456789012"
+                    error={!!errors.nationalId}
+                    helperText={errors.nationalId?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="nip"
+                control={control}
+                render={({ field }) => (
+                  <NIPInput
+                    value={field.value || ''}
+                    onChange={field.onChange}
+                    error={errors.nip?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="phoneNumber"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Téléphone *"
+                    placeholder="+241 07 12 34 56"
+                    error={!!errors.phoneNumber}
+                    helperText={errors.phoneNumber?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="email"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    value={field.value || ''}
+                    fullWidth
+                    label="Email"
+                    type="email"
+                    error={!!errors.email}
+                    helperText={errors.email?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="dateOfBirth"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Date de naissance *"
+                    type="date"
+                    value={field.value instanceof Date ? 
+                      field.value.toISOString().split('T')[0] : field.value}
+                    onChange={(e) => field.onChange(new Date(e.target.value))}
+                    error={!!errors.dateOfBirth}
+                    helperText={errors.dateOfBirth?.message}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth error={!!errors.gender}>
+                <InputLabel id="gender-label">Genre *</InputLabel>
+                <Controller
+                  name="gender"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      {...field}
+                      labelId="gender-label"
+                      label="Genre *"
+                    >
+                      <MenuItem value="M">Masculin</MenuItem>
+                      <MenuItem value="F">Féminin</MenuItem>
+                    </Select>
+                  )}
+                />
+                {errors.gender && (
+                  <FormHelperText>{errors.gender.message}</FormHelperText>
+                )}
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth error={!!errors.province}>
+                <InputLabel id="province-label">Province *</InputLabel>
+                <Controller
+                  name="province"
+                  control={control}
+                  render={({ field }) => (
+                    <Select
+                      {...field}
+                      labelId="province-label"
+                      label="Province *"
+                    >
+                      <MenuItem value="Estuaire">Estuaire</MenuItem>
+                      <MenuItem value="Haut-Ogooué">Haut-Ogooué</MenuItem>
+                      <MenuItem value="Moyen-Ogooué">Moyen-Ogooué</MenuItem>
+                      <MenuItem value="Ngounié">Ngounié</MenuItem>
+                      <MenuItem value="Nyanga">Nyanga</MenuItem>
+                      <MenuItem value="Ogooué-Ivindo">Ogooué-Ivindo</MenuItem>
+                      <MenuItem value="Ogooué-Lolo">Ogooué-Lolo</MenuItem>
+                      <MenuItem value="Ogooué-Maritime">Ogooué-Maritime</MenuItem>
+                      <MenuItem value="Woleu-Ntem">Woleu-Ntem</MenuItem>
+                    </Select>
+                  )}
+                />
+                {errors.province && (
+                  <FormHelperText>{errors.province.message}</FormHelperText>
+                )}
+              </FormControl>
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="city"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Ville *"
+                    error={!!errors.city}
+                    helperText={errors.city?.message}
+                  />
+                )}
+              />
+            </Grid>
+
+            <Grid item xs={12} sm={6}>
+              <Controller
+                name="address"
+                control={control}
+                render={({ field }) => (
+                  <TextField
+                    {...field}
+                    fullWidth
+                    label="Adresse"
+                    multiline
+                    rows={2}
+                    error={!!errors.address}
+                    helperText={errors.address?.message}
                   />
                 )}
               />
             </Grid>
           </Grid>
-        </form>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} color="error">Annuler</Button>
-        <Button
-          onClick={handleSubmit(handleFormSubmit)}
-          variant="contained"
-          disabled={isSubmitting || !isValid}
-        >
-          {isSubmitting ? <CircularProgress size={24} /> : (mode === 'create' ? 'Créer' : 'Sauvegarder')}
-        </Button>
-      </DialogActions>
-      {submitError && (
-        <Box sx={{ p: 2, pt: 0 }}>
-          <Alert severity="error">{submitError}</Alert>
-        </Box>
-      )}
-    </Dialog>
+        </Grid>
+        
+        {/* Section Location & Vulnerability */}
+        <Grid item xs={12} md={6}>
+          <LocationPicker
+            onLocationSelect={handleLocationSelect}
+            initialLocation={initialData?.coordinates || undefined}
+          />
+        </Grid>
+
+        <Grid item xs={12} md={6}>
+          <VulnerabilityCalculator
+            age={watchedData.dateOfBirth ? 
+              (new Date().getFullYear() - new Date(watchedData.dateOfBirth).getFullYear()) : 
+              null
+            }
+            hasPhoto={!!watchedData.photo}
+            onScoreCalculate={setVulnerabilityScore}
+          />
+        </Grid>
+
+        {/* Boutons d'action */}
+        <Grid item xs={12}>
+          <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
+            <Button variant="outlined" type="button">
+              Annuler
+            </Button>
+            <Button 
+              variant="contained" 
+              type="submit"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Enregistrement...' : 
+               mode === 'create' ? 'Créer' : 'Modifier'}
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
+    </Box>
   );
 };

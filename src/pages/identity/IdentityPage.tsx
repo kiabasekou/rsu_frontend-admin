@@ -7,12 +7,12 @@ import {
   CircularProgress,
   Alert,
 } from '@mui/material';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import { DataGrid, GridColDef, GridValueGetterParams } from '@mui/x-data-grid';
 import { Add } from '@mui/icons-material';
 import { identityAPI } from '../../services/api';
-import { PersonIdentity } from '../../types';
+import { PersonIdentity } from '../../types/forms';
 
-const columns: GridColDef[] = [
+const columns: GridColDef<PersonIdentity>[] = [
   { field: 'full_name', headerName: 'Nom Complet', width: 200 },
   { field: 'national_id', headerName: 'CNI', width: 150 },
   { field: 'phone_number', headerName: 'Téléphone', width: 150 },
@@ -29,7 +29,8 @@ const columns: GridColDef[] = [
     headerName: 'Créé le', 
     width: 150,
     type: 'date',
-    valueGetter: (value) => new Date(value) 
+    valueGetter: (params: GridValueGetterParams<PersonIdentity>) => 
+      params.value ? new Date(params.value) : null
   },
 ];
 
@@ -73,7 +74,7 @@ export const IdentityPage: React.FC = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => {/* TODO: Ouvrir modal création */}}
+          onClick={() => {}}
         >
           Nouvelle Identité
         </Button>
@@ -87,16 +88,16 @@ export const IdentityPage: React.FC = () => {
 
       <Paper sx={{ height: 600, width: '100%' }}>
         <DataGrid
-            rows={persons}
-            columns={columns}
-            initialState={{
-                pagination: {
-                paginationModel: { page: 0, pageSize: 10 },
-                },
-            }}
-            pageSizeOptions={[10, 25, 50]}
-            disableRowSelectionOnClick
-            loading={loading}
+          rows={persons}
+          columns={columns}
+          initialState={{
+            pagination: {
+              paginationModel: { page: 0, pageSize: 10 },
+            },
+          }}
+          pageSizeOptions={[10, 25, 50]}
+          disableRowSelectionOnClick
+          loading={loading}
         />
       </Paper>
     </Box>

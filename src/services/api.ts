@@ -1,37 +1,32 @@
-import axios from 'axios';
-import { PersonIdentity, SocialProgram, APIResponse } from '../types';
+import axios, { AxiosResponse } from 'axios';
+import { PersonFormData, PersonIdentity, SearchFilters, APIResponse } from '../types/forms';
 
-const api = axios.create({
-  baseURL: 'http://localhost:8000',
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8000';
+
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Interceptors pour gestion erreurs
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    console.error('API Error:', error);
-    return Promise.reject(error);
-  }
-);
-
 export const identityAPI = {
-  getPersons: () => api.get<APIResponse<PersonIdentity>>('/identity/persons/'),
-  getPerson: (id: string) => api.get<PersonIdentity>(`/identity/persons/${id}/`),
-  createPerson: (data: Partial<PersonIdentity>) => api.post<PersonIdentity>('/identity/persons/', data),
-  updatePerson: (id: string, data: Partial<PersonIdentity>) => api.put<PersonIdentity>(`/identity/persons/${id}/`, data),
-  deletePerson: (id: string) => api.delete(`/identity/persons/${id}/`),
+  getPersons: async (filters?: SearchFilters): Promise<AxiosResponse<APIResponse<PersonIdentity>>> => {
+    return apiClient.get('/identity/persons/');
+  },
+
+  createPerson: async (data: PersonFormData): Promise<AxiosResponse<PersonIdentity>> => {
+    return apiClient.post('/identity/persons/', data);
+  },
+
+  updatePerson: async (id: string, data: PersonFormData): Promise<AxiosResponse<PersonIdentity>> => {
+    return apiClient.put(`/identity/persons/${id}/`, data);
+  },
 };
 
 export const programsAPI = {
-  getPrograms: () => api.get<APIResponse<SocialProgram>>('/programs/programs/'),
-  getProgram: (id: string) => api.get<SocialProgram>(`/programs/programs/${id}/`),
-  createProgram: (data: Partial<SocialProgram>) => api.post<SocialProgram>('/programs/programs/', data),
-  updateProgram: (id: string, data: Partial<SocialProgram>) => api.put<SocialProgram>(`/programs/programs/${id}/`, data),
-  deleteProgram: (id: string) => api.delete(`/programs/programs/${id}/`),
+  getPrograms: async () => {
+    return apiClient.get('/programs/');
+  },
 };
-
-export default api;
-

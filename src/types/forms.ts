@@ -2,70 +2,80 @@ export interface PersonFormData {
   firstName: string;
   lastName: string;
   nationalId: string;
+  nip?: string;
   phoneNumber: string;
   email?: string;
   dateOfBirth: Date;
-  gender: 'M' | 'F' | 'Autre';
-  city: string;
+  gender: 'M' | 'F';
   province: string;
-  address: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
+  city: string;
+  address?: string;
+  photo?: File | string | null;
+  vulnerabilityScore?: number | null;
+  coordinates?: { latitude: number; longitude: number } | null;
+}
+
+export interface PersonIdentity extends Omit<PersonFormData, 'photo'> {
+  id: number;
+  fullName: string;
+  isValidated: boolean;
+  createdAt: string;
+  updatedAt: string;
+  photo?: string;
+  nipValidationStatus?: {
+    isValid: boolean;
+    lastChecked: Date;
+    source: 'RBPP' | 'LOCAL';
   };
-  photo?: File;
-  vulnerabilityScore?: number;
-  socialPrograms?: string[];
-}
-
-export interface GeographicZone {
-  id: string;
-  name: string;
-  type: 'PROVINCE' | 'DEPARTMENT' | 'CITY' | 'DISTRICT';
-  parentId?: string;
-  coordinates?: {
-    latitude: number;
-    longitude: number;
-  };
-}
-
-export interface EligibilityCriteria {
-  id: string;
-  type: 'AGE' | 'INCOME' | 'LOCATION' | 'FAMILY_SIZE' | 'DISABILITY';
-  operator: 'GT' | 'LT' | 'EQ' | 'GTE' | 'LTE' | 'IN' | 'NOT_IN';
-  value: string | number | string[];
-  weight: number;
-}
-
-export interface ProgramFormData {
-  code: string;
-  name: string;
-  description: string;
-  programType: 'CASH_TRANSFER' | 'FOOD_ASSISTANCE' | 'HEALTH_CARE' | 'EDUCATION';
-  totalBudget: number;
-  allocatedBudget: number;
-  maxBeneficiaries: number;
-  eligibilityCriteria: EligibilityCriteria[];
-  geographicZones: GeographicZone[];
-  startDate: Date;
-  endDate: Date;
-  status: 'DRAFT' | 'ACTIVE' | 'SUSPENDED' | 'COMPLETED';
 }
 
 export interface SearchFilters {
   query?: string;
   nationalId?: string;
+  nip?: string;
   phoneNumber?: string;
+  gender?: 'M' | 'F' | '';
   province?: string;
   city?: string;
   ageMin?: number;
   ageMax?: number;
-  gender?: string;
+  dateCreatedFrom?: Date | null;
+  dateCreatedTo?: Date | null;
+  vulnerabilityScoreMin?: number;
+  vulnerabilityScoreMax?: number;
+  socialPrograms?: string[];
   hasPhoto?: boolean;
   isValidated?: boolean;
-  socialPrograms?: string[];
-  vulnerabilityMin?: number;
-  vulnerabilityMax?: number;
-  dateCreatedFrom?: Date;
-  dateCreatedTo?: Date;
+  hasNIP?: boolean;
+}
+
+export interface APIResponse<T> {
+  results: T[];
+  count: number;
+  next?: string;
+  previous?: string;
+}
+
+// Props interfaces
+export interface PhotoUploadProps {
+  onUpload: (file: File | null) => void;
+  preview?: string | File | null;
+  maxSize?: number;
+  allowedTypes?: string[];
+}
+
+export interface LocationPickerProps {
+  onLocationSelect: (location: { latitude: number; longitude: number }) => void;
+  initialLocation?: { latitude: number; longitude: number } | null;
+  showMap?: boolean;
+  enableGPS?: boolean;
+}
+
+export interface VulnerabilityCalculatorProps {
+  age?: number | null;
+  hasPhoto?: boolean;
+  hasPhone?: boolean;
+  province?: string;
+  city?: string;
+  onScoreCalculate: (score: number | null) => void;
 }

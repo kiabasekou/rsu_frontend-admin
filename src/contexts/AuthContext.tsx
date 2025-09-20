@@ -60,6 +60,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    // Mode démo en développement
+    if (process.env.NODE_ENV === 'development') {
+      setUser({
+        id: '1',
+        username: 'demo',
+        email: 'demo@rsu.ga',
+        firstName: 'Utilisateur',
+        lastName: 'Démo',
+        role: UserRole.SUPER_ADMIN,
+        permissions: PERMISSIONS[UserRole.SUPER_ADMIN],
+        isActive: true
+      });
+      setIsLoading(false);
+      return;
+    }
+
     const token = localStorage.getItem('auth_token');
     if (token) {
       validateToken(token);
@@ -92,34 +108,48 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const login = async (credentials: LoginCredentials) => {
+    // Mode démo - connexion automatique en développement
+    if (process.env.NODE_ENV === 'development') {
+      setUser({
+        id: '1',
+        username: credentials.username,
+        email: 'demo@rsu.ga',
+        firstName: 'Utilisateur',
+        lastName: 'Démo',
+        role: UserRole.SUPER_ADMIN,
+        permissions: PERMISSIONS[UserRole.SUPER_ADMIN],
+        isActive: true
+      });
+      return;
+    }
+
     setIsLoading(true);
+
     try {
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch(`http://localhost:8000/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Erreur de connexion');
+        throw new Error('Identifiants invalides');
       }
 
-      const { user: userData, token } = await response.json();
-      
-      if (credentials.rememberMe) {
-        localStorage.setItem('auth_token', token);
-      } else {
-        sessionStorage.setItem('auth_token', token);
-      }
-
+      const data = await response.json();
       setUser({
-        ...userData,
-        permissions: PERMISSIONS[userData.role as UserRole] || []
+        ...data.user,
+        permissions: PERMISSIONS[data.user.role as UserRole] || []
       });
       
-    } catch (error) {
-      throw error;
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+    } catch (err) {
+      console.error('Erreur de connexion:', err);
+      throw err;
     } finally {
       setIsLoading(false);
     }

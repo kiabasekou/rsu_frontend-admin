@@ -1,259 +1,233 @@
-// src/components/common/PhotoUpload.tsx
-
-import React, { useState, useCallback } from 'react';
-import { useDropzone } from 'react-dropzone';
+import React, { useCallback, useState } from 'react';
 import {
-  Box, Avatar, Button, IconButton, Dialog, DialogContent,
-  Typography, CircularProgress, Alert, Slider
+  Box,
+  Button,
+  Avatar,
+  Typography,
+  Paper,
+  IconButton,
+  CircularProgress,
 } from '@mui/material';
-import { PhotoCamera, Delete, Crop } from '@mui/icons-material';
-import Cropper from 'react-easy-crop';
+import {
+  CloudUpload,
+  Delete,
+  PhotoCamera,
+} from '@mui/icons-material';
 
 interface PhotoUploadProps {
   onUpload: (file: File | null) => void;
-  preview?: File | string;
-  maxSize?: number;
-  quality?: number;
-  cropAspect?: number;
-}
-
-interface CroppedAreaPixels {
-  width: number;
-  height: number;
-  x: number;
-  y: number;
+  preview?: string | File | null;
+  maxSize?: number; // en MB
+  allowedTypes?: string[];
 }
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({
   onUpload,
   preview,
   maxSize = 5,
-  quality = 0.8,
-  cropAspect = 1
+  allowedTypes = ['image/jpeg', 'image/png', 'image/webp'],
 }) => {
-  const [cropDialog, setCropDialog] = useState(false);
-  const [currentImage, setCurrentImage] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<CroppedAreaPixels | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    if (file.size > maxSize * 1024 * 1024) {
-      setError(`La taille du fichier ne doit pas dépasser ${maxSize}MB`);
-      return;
-    }
-
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = () => {
-      setCurrentImage(reader.result as string);
-      setCropDialog(true);
-    };
-    reader.readAsDataURL(file);
-  }, [maxSize]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.webp']
-    },
-    multiple: false,
-    maxSize: maxSize * 1024 * 1024
-  });
-
-  const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: CroppedAreaPixels) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
-
-  const createCroppedImage = async (): Promise<File> => {
-    if (!currentImage || !croppedAreaPixels) {
-      throw new Error('Données manquantes');
-    }
-
-    return new Promise((resolve, reject) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-
-      img.onload = () => {
-        canvas.width = croppedAreaPixels.width;
-        canvas.height = croppedAreaPixels.height;
-
-        ctx?.drawImage(
-          img,
-          croppedAreaPixels.x,
-          croppedAreaPixels.y,
-          croppedAreaPixels.width,
-          croppedAreaPixels.height,
-          0,
-          0,
-          croppedAreaPixels.width,
-          croppedAreaPixels.height
-        );
-
-        canvas.toBlob(
-          (blob) => {
-            if (blob) {
-              const file = new File([blob], 'photo.jpg', {
-                type: 'image/jpeg',
-                lastModified: Date.now()
-              });
-              resolve(file);
-            } else {
-              reject(new Error('Erreur création image'));
-            }
-          },
-          'image/jpeg',
-          quality
-        );
-      };
-
-      img.onerror = () => reject(new Error('Erreur chargement image'));
-      img.src = currentImage;
-    });
+  const getPreviewUrl = (): string | null => {
+    if (!preview) return null;
+    if (typeof preview === 'string') return preview;
+    if (preview instanceof File) return URL.createObjectURL(preview);
+    return null;
   };
 
-  const handleSaveCrop = async () => {
+  const validateFile = (file: File): string | null => {
+    if (!allowedTypes.includes(file.type)) {
+      return `Type de fichier non supporté. Types autorisés: ${allowedTypes.join(', ')}`;
+    }
+    
+    if (file.size > maxSize * 1024 * 1024) {
+      return `Fichier trop volumineux. Taille maximale: ${maxSize}MB`;
+    }
+    
+    return null;
+  };
+
+  const handleFileSelect = useCallback(async (file: File) => {
+    setError(null);
     setUploading(true);
+
     try {
-      const croppedFile = await createCroppedImage();
-      onUpload(croppedFile);
-      setCropDialog(false);
-      setCurrentImage(null);
-    } catch (error) {
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
+        return;
+      }
+
+      // Compression/redimensionnement de l'image
+      const compressedFile = await compressImage(file);
+      onUpload(compressedFile);
+    } catch (err) {
       setError('Erreur lors du traitement de l\'image');
     } finally {
       setUploading(false);
     }
+  }, [onUpload, maxSize, allowedTypes]);
+
+  const compressImage = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d')!;
+      const img = new Image();
+
+      img.onload = () => {
+        // Redimensionner à 400x400 max en gardant le ratio
+        const maxSize = 400;
+        let { width, height } = img;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob(
+          (blob) => {
+            const compressedFile = new File([blob!], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          },
+          'image/jpeg',
+          0.8
+        );
+      };
+
+      img.src = URL.createObjectURL(file);
+    });
   };
 
-  const handleDelete = () => {
-    onUpload(null);
-  };
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
 
-  const previewUrl = preview 
-    ? typeof preview === 'string' ? preview : URL.createObjectURL(preview)
-    : null;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  }, [handleFileSelect]);
+
+  const handleFileInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      handleFileSelect(files[0]);
+    }
+  }, [handleFileSelect]);
+
+  const previewUrl = getPreviewUrl();
 
   return (
-    <>
-      <Box sx={{ position: 'relative', display: 'inline-block' }}>
-        {previewUrl ? (
-          <Box sx={{ position: 'relative' }}>
+    <Box sx={{ textAlign: 'center' }}>
+      <Paper
+        sx={{
+          p: 2,
+          border: dragOver ? '2px dashed primary.main' : '2px dashed grey.300',
+          borderRadius: 2,
+          bgcolor: dragOver ? 'primary.50' : 'background.paper',
+          cursor: 'pointer',
+          transition: 'all 0.2s',
+          '&:hover': {
+            borderColor: 'primary.main',
+            bgcolor: 'primary.50',
+          },
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+      >
+        {uploading ? (
+          <Box sx={{ py: 4 }}>
+            <CircularProgress />
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Traitement de l'image...
+            </Typography>
+          </Box>
+        ) : previewUrl ? (
+          <Box>
             <Avatar
               src={previewUrl}
-              sx={{ width: 120, height: 120, mb: 2 }}
+              sx={{ width: 120, height: 120, mx: 'auto', mb: 2 }}
             />
-            <IconButton
-              size="small"
-              onClick={handleDelete}
-              sx={{
-                position: 'absolute',
-                top: 0,
-                right: 0,
-                bgcolor: 'error.main',
-                color: 'white',
-                '&:hover': { bgcolor: 'error.dark' }
-              }}
-            >
-              <Delete />
-            </IconButton>
+            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+              <Button
+                component="label"
+                variant="outlined"
+                startIcon={<PhotoCamera />}
+                size="small"
+              >
+                Changer
+                <input
+                  hidden
+                  accept="image/*"
+                  type="file"
+                  onChange={handleFileInputChange}
+                />
+              </Button>
+              <IconButton
+                color="error"
+                onClick={() => onUpload(null)}
+                size="small"
+              >
+                <Delete />
+              </IconButton>
+            </Box>
           </Box>
         ) : (
-          <Box
-            {...getRootProps()}
-            sx={{
-              width: 120,
-              height: 120,
-              border: 2,
-              borderColor: isDragActive ? 'primary.main' : 'grey.300',
-              borderStyle: 'dashed',
-              borderRadius: '50%',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-              bgcolor: isDragActive ? 'primary.50' : 'grey.50',
-              transition: 'all 0.2s ease'
-            }}
-          >
-            <input {...getInputProps()} />
-            <PhotoCamera sx={{ fontSize: 40, color: 'grey.500', mb: 1 }} />
-            <Typography variant="caption" align="center" color="text.secondary">
-              {isDragActive ? 'Déposer ici' : 'Photo d\'identité'}
+          <Box sx={{ py: 4 }}>
+            <CloudUpload sx={{ fontSize: 48, color: 'grey.400', mb: 2 }} />
+            <Typography variant="h6" gutterBottom>
+              Photo d'identité
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Glissez-déposez ou cliquez pour sélectionner
+            </Typography>
+            <Button
+              component="label"
+              variant="contained"
+              startIcon={<CloudUpload />}
+            >
+              Sélectionner une photo
+              <input
+                hidden
+                accept="image/*"
+                type="file"
+                onChange={handleFileInputChange}
+              />
+            </Button>
+            <Typography variant="caption" display="block" sx={{ mt: 1 }}>
+              Formats acceptés: JPEG, PNG, WebP (max {maxSize}MB)
             </Typography>
           </Box>
         )}
-      </Box>
+      </Paper>
 
       {error && (
-        <Alert severity="error" sx={{ mt: 1, maxWidth: 300 }}>
+        <Typography color="error" variant="body2" sx={{ mt: 1 }}>
           {error}
-        </Alert>
+        </Typography>
       )}
-
-      <Dialog
-        open={cropDialog}
-        onClose={() => setCropDialog(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogContent sx={{ p: 0, position: 'relative', height: 400 }}>
-          {currentImage && (
-            <Cropper
-              image={currentImage}
-              crop={crop}
-              zoom={zoom}
-              aspect={cropAspect}
-              onCropChange={setCrop}
-              onZoomChange={setZoom}
-              onCropComplete={onCropComplete}
-            />
-          )}
-          
-          <Box sx={{ 
-            position: 'absolute', 
-            bottom: 16, 
-            left: 16, 
-            right: 16,
-            bgcolor: 'background.paper',
-            borderRadius: 1,
-            p: 2
-          }}>
-            <Typography variant="body2" gutterBottom>
-              Zoom
-            </Typography>
-            <Slider
-              value={zoom}
-              min={1}
-              max={3}
-              step={0.1}
-              onChange={(_, value) => setZoom(value as number)}
-              sx={{ mb: 2 }}
-            />
-            
-            <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
-              <Button onClick={() => setCropDialog(false)}>
-                Annuler
-              </Button>
-              <Button
-                variant="contained"
-                onClick={handleSaveCrop}
-                disabled={uploading}
-                startIcon={uploading ? <CircularProgress size={20} /> : <Crop />}
-              >
-                {uploading ? 'Traitement...' : 'Valider'}
-              </Button>
-            </Box>
-          </Box>
-        </DialogContent>
-      </Dialog>
-    </>
+    </Box>
   );
 };
